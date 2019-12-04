@@ -1,131 +1,81 @@
 package main
 
 import (
+	"fmt"
 	"image"
 	_ "image/png"
 	"log"
-	"os"
 	"sync"
-	"time"
 
-	"github.com/faiface/pixel"
-	"github.com/faiface/pixel/pixelgl"
 	"github.com/google/hilbert"
+	"github.com/hajimehoshi/ebiten"
+	"github.com/hajimehoshi/ebiten/ebitenutil"
 	"golang.org/x/image/colornames"
 )
 
 const (
-	W = 4096
-	H = 4096
+	W = 1024
+	H = 1024
 )
 
-func loadPicture(path string) (pixel.Picture, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-	img, _, err := image.Decode(file)
-	if err != nil {
-		return nil, err
-	}
-	return pixel.PictureDataFromImage(img), nil
+type IPVIZ struct {
+	hilb       *hilbert.Hilbert
+	ipChan     chan uint32
+	picLock    sync.Mutex
+	ipImage    *image.RGBA
+	totalConns int
 }
 
-func run() {
-
-	hilb, err := hilbert.NewHilbert(4096)
+func NewIPVIZ() (*IPVIZ, error) {
+	hilb, err := hilbert.NewHilbert(1024)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
-	ipChan := make(chan uint32, 100)
-	go listen("0.0.0.0", 9999, ipChan)
+	ipImage := image.NewRGBA(image.Rect(0, 0, W, H))
 
-	cfg := pixelgl.WindowConfig{
-		Title:  "Pixel Rocks!",
-		Bounds: pixel.R(0, 0, 1024, 768),
-		VSync:  true,
-	}
-	win, err := pixelgl.NewWindow(cfg)
-	if err != nil {
-		panic(err)
-	}
-
-	win.Clear(colornames.White)
-
-	/*
-		im, err := loadPicture("scan.png")
-		if err != nil {
-			log.Fatal(err)
-		}*/
-	pic := pixel.MakePictureData(pixel.R(0, 0, W, H))
-	//pic := pixel.PictureDataFromPicture(im)
-	sprite := pixel.NewSprite(pic, pic.Bounds())
-
-	var totalPoints int
 	var picLock sync.Mutex
+	ipChan := make(chan uint32, 100)
+	viz := IPVIZ{
+		hilb:    hilb,
+		ipChan:  ipChan,
+		ipImage: ipImage,
+		picLock: picLock,
+	}
+	go listen("0.0.0.0", 9999, ipChan)
 	go func() {
 		for ip := range ipChan {
-			totalPoints++
-			x, y, err := hilb.Map(int(ip / 256))
+			x, y, err := hilb.Map(int(ip / 256 / 16))
 			if err != nil {
-				log.Fatal(err)
+				log.Fatalf("Map failed: %v %d", err, ip/256/4)
 			}
-			lx := float64(x)
-			ly := float64(y)
 			picLock.Lock()
-			for xx := lx; xx < lx+20 && xx < W; xx++ {
-				for yy := ly; yy < ly+20 && yy < H; yy++ {
-					pi := pic.Index(pixel.V(xx, yy))
-					pic.Pix[pi] = colornames.Black
-				}
-			}
+			ipImage.Set(x, y, colornames.White)
+			viz.totalConns++
 			picLock.Unlock()
 		}
 	}()
+	return &viz, nil
+}
 
-	var ticker = time.Tick(1000 * time.Millisecond)
-	for !win.Closed() {
-		if win.JustPressed(pixelgl.KeyQ) {
-			return
-		}
-
-		//Scale
-		win_bounds := win.Bounds().Max
-		win_width := win_bounds.X
-		win_height := win_bounds.Y
-		bounds := sprite.Frame().Max
-		width := bounds.X
-		height := bounds.Y
-
-		xratio := float64(win_width) / width
-		yratio := float64(win_height) / height
-
-		var scale float64
-		if xratio > 1 && yratio > 1 {
-			scale = 1
-		} else if xratio < yratio {
-			scale = xratio
-		} else {
-			scale = yratio
-		}
-		//End scale
-
-		select {
-		case <-ticker:
-			log.Printf("Rendering %d points", totalPoints)
-			picLock.Lock()
-			sprite = pixel.NewSprite(pic, pic.Bounds())
-			picLock.Unlock()
-		default:
-		}
-
-		sprite.Draw(win, pixel.IM.Scaled(pixel.ZV, scale).Moved(win.Bounds().Center()))
-		win.Update()
+func (v *IPVIZ) update(screen *ebiten.Image) error {
+	if ebiten.IsDrawingSkipped() {
+		return nil
 	}
+
+	v.picLock.Lock()
+	screen.ReplacePixels(v.ipImage.Pix)
+	ebitenutil.DebugPrint(screen, fmt.Sprintf("TPS: %0.2f. Conns: %d", ebiten.CurrentTPS(), v.totalConns))
+	v.picLock.Unlock()
+	return nil
 }
 
 func main() {
-	pixelgl.Run(run)
+	ipviz, err := NewIPVIZ()
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := ebiten.Run(ipviz.update, W, H, 1, "Noise (Ebiten Demo)"); err != nil {
+		log.Fatal(err)
+	}
 }

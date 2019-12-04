@@ -43,7 +43,13 @@ func handleLog(conn net.Conn, lineChan chan uint32) {
 	buf := make([]byte, 0, bufferSize)
 	scanner.Buffer(buf, 1024*1024)
 	for scanner.Scan() {
-		value, err := jsonparser.GetString(scanner.Bytes(), "id.resp_h")
+		value, err := jsonparser.GetString(scanner.Bytes(), "id.orig_h")
+		if err != nil {
+			log.Printf("Error json %v", err)
+			continue
+		}
+		lineChan <- ip2Long(value)
+		value, err = jsonparser.GetString(scanner.Bytes(), "id.resp_h")
 		if err != nil {
 			log.Printf("Error json %v", err)
 			continue
