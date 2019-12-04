@@ -17,6 +17,12 @@ func ip2Long(ip string) uint32 {
 	return long
 }
 
+func int2ip(nn uint32) net.IP {
+	ip := make(net.IP, 4)
+	binary.BigEndian.PutUint32(ip, nn)
+	return ip
+}
+
 const bufferSize int = 128 * 1024
 
 func listen(addr string, port int, lineChan chan uint32) {

@@ -62,10 +62,15 @@ func (v *IPVIZ) update(screen *ebiten.Image) error {
 	if ebiten.IsDrawingSkipped() {
 		return nil
 	}
+	mx, my := ebiten.CursorPosition()
+	ip, err := v.hilb.MapInverse(mx, my)
+	if err != nil {
+		ip = 0
+	}
 
 	v.picLock.Lock()
 	screen.ReplacePixels(v.ipImage.Pix)
-	ebitenutil.DebugPrint(screen, fmt.Sprintf("TPS: %0.2f. Conns: %d", ebiten.CurrentTPS(), v.totalConns))
+	ebitenutil.DebugPrint(screen, fmt.Sprintf("TPS: %0.2f. Conns: %d. IP=%s", ebiten.CurrentTPS(), v.totalConns, int2ip(uint32(ip*256*16))))
 	v.picLock.Unlock()
 	return nil
 }
