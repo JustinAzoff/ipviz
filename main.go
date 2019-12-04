@@ -20,7 +20,7 @@ const (
 
 type IPVIZ struct {
 	hilb       *hilbert.Hilbert
-	ipChan     chan uint32
+	ipChan     chan IPRecord
 	picLock    sync.Mutex
 	ipImage    *image.RGBA
 	totalConns int
@@ -35,7 +35,7 @@ func NewIPVIZ() (*IPVIZ, error) {
 	ipImage := image.NewRGBA(image.Rect(0, 0, W, H))
 
 	var picLock sync.Mutex
-	ipChan := make(chan uint32, 100)
+	ipChan := make(chan IPRecord, 100)
 	viz := IPVIZ{
 		hilb:    hilb,
 		ipChan:  ipChan,
@@ -44,13 +44,17 @@ func NewIPVIZ() (*IPVIZ, error) {
 	}
 	go listen("0.0.0.0", 9999, ipChan)
 	go func() {
-		for ip := range ipChan {
-			x, y, err := hilb.Map(int(ip / 256 / 16))
+		for iprec := range ipChan {
+			x, y, err := hilb.Map(int(iprec.ip / 256 / 16))
 			if err != nil {
-				log.Fatalf("Map failed: %v %d", err, ip/256/4)
+				log.Fatalf("Map failed: %v %d", err, iprec.ip/256/4)
 			}
 			picLock.Lock()
-			ipImage.Set(x, y, colornames.White)
+			if iprec.orig {
+				ipImage.Set(x, y, colornames.Green)
+			} else {
+				ipImage.Set(x, y, colornames.Red)
+			}
 			viz.totalConns++
 			picLock.Unlock()
 		}

@@ -11,6 +11,11 @@ import (
 	"github.com/buger/jsonparser"
 )
 
+type IPRecord struct {
+	ip   uint32
+	orig bool
+}
+
 func ip2Long(ip string) uint32 {
 	var long uint32
 	binary.Read(bytes.NewBuffer(net.ParseIP(ip).To4()), binary.BigEndian, &long)
@@ -25,7 +30,7 @@ func int2ip(nn uint32) net.IP {
 
 const bufferSize int = 128 * 1024
 
-func listen(addr string, port int, lineChan chan uint32) {
+func listen(addr string, port int, lineChan chan IPRecord) {
 	bind := fmt.Sprintf("%s:%d", addr, port)
 	log.Printf("Listening on %s", bind)
 	l, err := net.Listen("tcp", bind)
@@ -43,7 +48,7 @@ func listen(addr string, port int, lineChan chan uint32) {
 	}
 }
 
-func handleLog(conn net.Conn, lineChan chan uint32) {
+func handleLog(conn net.Conn, lineChan chan IPRecord) {
 	defer conn.Close()
 	scanner := bufio.NewScanner(conn)
 	buf := make([]byte, 0, bufferSize)
@@ -54,13 +59,13 @@ func handleLog(conn net.Conn, lineChan chan uint32) {
 			log.Printf("Error json %v", err)
 			continue
 		}
-		lineChan <- ip2Long(value)
+		lineChan <- IPRecord{ip: ip2Long(value), orig: true}
 		value, err = jsonparser.GetString(scanner.Bytes(), "id.resp_h")
 		if err != nil {
 			log.Printf("Error json %v", err)
 			continue
 		}
-		lineChan <- ip2Long(value)
+		lineChan <- IPRecord{ip: ip2Long(value), orig: false}
 	}
 	if err := scanner.Err(); err != nil {
 		log.Printf("Error reading from connection: %v", err)
