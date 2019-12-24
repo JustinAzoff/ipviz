@@ -12,7 +12,7 @@ import (
 )
 
 type IPRecord struct {
-	ip   uint32
+	ip   string
 	orig bool
 }
 
@@ -59,13 +59,13 @@ func handleLog(conn net.Conn, lineChan chan IPRecord) {
 			log.Printf("Error json %v", err)
 			continue
 		}
-		lineChan <- IPRecord{ip: ip2Long(value), orig: true}
+		lineChan <- IPRecord{ip: value, orig: true}
 		value, err = jsonparser.GetString(scanner.Bytes(), "id.resp_h")
 		if err != nil {
 			log.Printf("Error json %v", err)
 			continue
 		}
-		lineChan <- IPRecord{ip: ip2Long(value), orig: false}
+		lineChan <- IPRecord{ip: value, orig: false}
 	}
 	if err := scanner.Err(); err != nil {
 		log.Printf("Error reading from connection: %v", err)
