@@ -47,7 +47,7 @@ func NewIPVIZ() (*IPVIZ, error) {
 		for iprec := range ipChan {
 			x, y, err := hilb.Map(int(iprec.ip / 256 / 16))
 			if err != nil {
-				log.Fatalf("Map failed: %v %d", err, iprec.ip/256/4)
+				log.Fatalf("Map failed: %v %d", err, (iprec.ip / 256 / 16))
 			}
 			picLock.Lock()
 			if iprec.orig {
