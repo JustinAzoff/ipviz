@@ -34,6 +34,16 @@ func NewIPVIZ() (*IPVIZ, error) {
 	}
 
 	ipImage := image.NewRGBA(image.Rect(0, 0, W, H))
+	for x := 0; x < W; x += 64 {
+		for y := 0; y < H; y++ {
+			ipImage.Set(x, y, colornames.Darkslategrey)
+		}
+	}
+	for x := 0; x < W; x++ {
+		for y := 0; y < H; y += 64 {
+			ipImage.Set(x, y, colornames.Darkslategrey)
+		}
+	}
 
 	var picLock sync.Mutex
 	ipChan := make(chan IPRecord, 100)
